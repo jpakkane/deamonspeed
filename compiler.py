@@ -36,6 +36,9 @@ class Compiler:
         time.sleep(self.times.default_compile)
         open(self.options.output, 'wb').close()
 
+    def link(self):
+        time.sleep(self.times.default_link)
+        open(self.options.output, 'wb').close()
 
 if __name__ == '__main__':
     args = cmdparser.parse_args()
