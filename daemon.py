@@ -5,7 +5,7 @@
 
 import os, sys, time, socket, pathlib
 
-def run_daemon(socketpath):
+def run_daemon(socketpath, startup_time):
     if socketpath.exists():
         return
     timeout = 10
@@ -15,6 +15,7 @@ def run_daemon(socketpath):
     except OSError:
         return
     server.settimeout(timeout)
+    time.sleep(startup_time)
     while True:
         server.listen()
         conn, address = server.accept()
@@ -24,7 +25,8 @@ def run_daemon(socketpath):
 
 if __name__ == '__main__':
     socketpath = pathlib.Path(sys.argv[1])
+    startup_time = int(pathlib.Path(sys.argv[2]))
     try:
-        run_daemon(socketpath)
+        run_daemon(socketpath, startup_time)
     except TimeoutError:
         socketpath.unlink()
