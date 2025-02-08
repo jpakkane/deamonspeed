@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # (c) 2025 Jussi Pakkanen
 
-import os, sys, time, argparse, socket
+import os, sys, time, argparse, socket, pathlib, subprocess
 
 cmdparser = argparse.ArgumentParser()
 cmdparser.add_argument('-c', action='store_true', dest='is_compiler', default=False)
@@ -23,6 +23,11 @@ class Compiler:
         self.options = options
         self.times = Durations()
 
+        if self.options.private_dir is not None:
+            self.private_dir = pathlib.Path(self.options.private_dir)
+            self.socket_path = self.private_dir / 'daemonsocket'
+            self.socket_path_bytes = str(self.socket_path).encode('UTF-8')
+
     def is_compile(self):
         return self.options.is_compiler
 
@@ -37,20 +42,37 @@ class Compiler:
             self.compile_with_daemon()
         else:
             time.sleep(self.times.default_compile)
-            open(self.options.output, 'wb').close()
+        open(self.options.output, 'wb').close()
 
     def compile_with_daemon(self):
-        socket_path = pathlib.Path(self.options.private_dir) / 'daemonsocket'
-        os.subprocess.Popen(['../daemon.py', socket_path, f'{self.times.stdlib_compile}'])
-        self.connect_daemon(socket_path)
+        if not self.try_connect_daemon():
+            if os.fork() == 0:
+                os.execvp('../daemon.py',  ['../daemon.py',
+                                            self.options.private_dir,
+                                            str(self.times.stdlib_compile)])
+                sys.exit('Unreachable!')
+            self.connect_daemon()
         time.sleep(self.times.daemon_compile)
 
-    def connect_daemon(self, socket_path):
-        socket_path_bytes = str(socket_path).encode('UTF-8')
-        for i in range(10):
-            time.sleep(1)
+    def try_connect_daemon(self, ):
+        conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            conn.connect(self.socket_path_bytes)
+        except (FileNotFoundError, ConnectionRefusedError):
+            return False
+        conn.sendall(b'a')
+        response = conn.recv(1)
+        conn.close()
+        return True
+
+    def connect_daemon(self):
+        for i in range(5):
             conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            conn.connect(socket_path)
+            try:
+                conn.connect(self.socket_path_bytes)
+            except (FileNotFoundError, ConnectionRefusedError):
+                time.sleep(1)
+                continue
             conn.sendall(b'a')
             response = conn.recv(1)
             conn.close()

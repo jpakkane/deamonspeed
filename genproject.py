@@ -3,9 +3,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # (c) 2025 Jussi Pakkanen
 
-import os, sys, pathlib, shutil
+import os, sys, pathlib, shutil, argparse
 
-def setup(source_dir, build_dir, num_sources):
+cmdparser = argparse.ArgumentParser()
+cmdparser.add_argument('--daemon', action='store_true', dest='daemon', default=False)
+cmdparser.add_argument('--num-sources', dest='num_sources', default=100, type=int)
+
+
+def setup(source_dir, build_dir, num_sources, use_daemon):
     if source_dir.exists():
         shutil.rmtree(source_dir)
     if build_dir.exists():
@@ -22,11 +27,15 @@ def setup(source_dir, build_dir, num_sources):
         open(source_dir / s, 'wb').close()
 
     # Write Ninja file
+    if use_daemon:
+        extra_args = f'--private-dir private'
+    else:
+        extra_args = ''
     with open(build_dir / 'build.ninja', 'w') as ofile:
         ofile.write('ninja_required_version = 1.8.2\n')
-        ofile.write('''
+        ofile.write(f'''
 rule compiler
- command = ../compiler.py -c -o $out $in
+ command = ../compiler.py {extra_args} -c -o $out $in
  description = Compiling $in
 ''')
         ofile.write('''
@@ -39,9 +48,8 @@ rule custom
  command = $cmd
 
 build clean: custom
- cmd = ninja -t clean
+ command = ninja -t clean
  description = Cleaning
-
 ''')
 
         for i in range(num_sources):
@@ -55,6 +63,17 @@ build clean: custom
             ofile.write(o)
             ofile.write(' ')
         ofile.write('\n')
+        ofile.write('default output\n')
 
 if __name__ == '__main__':
-    setup(pathlib.Path('srcdir'), pathlib.Path('builddir'), 100)
+    args = cmdparser.parse_args()
+    setup(pathlib.Path('srcdir'), pathlib.Path('builddir'), args.num_sources, args.daemon)
+    if args.daemon:
+        print('''To run the timing test run this command:
+
+./daemon.py builddir/private 1&; time ninja -C builddir
+
+Ninja seems to track that all spawned child processes have also finished
+and I could not find a way to make it not do so. If you run the build command
+directly, your timing will have 10 extra seconds while Ninja waits for the
+daemon to shut down.''')
