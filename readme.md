@@ -1,7 +1,11 @@
 # Compiler daemon timing experiment
 
-Test implementation of [a compiler daemon that prebuilds the standard
-library](https://nibblestew.blogspot.com/2024/12/compiler-daemon-thought-experiment.html).
+A "fake" implementation of [a compiler daemon that prebuilds the
+standard
+library](https://nibblestew.blogspot.com/2024/12/compiler-daemon-thought-experiment.html). It
+performs all the same steps as a real compiler but instead of
+compiling it just sleeps. All sleep time intervals are changeable so
+people can easily evaluate what sort of a speedup they would get.
 
 Basically:
 
@@ -13,5 +17,5 @@ Basically:
 usual way. Passing`--daemon` to it makes it use the daemon process.
 
 On this laptop with 22 cores, compiling the code regularly takes 26
-seconds and 7 seconds with the daemon. This is approximately a 3.7x
-speedup.
+seconds while the daemon version takes 7 seconds. This is
+approximately a 3.7x speedup.
